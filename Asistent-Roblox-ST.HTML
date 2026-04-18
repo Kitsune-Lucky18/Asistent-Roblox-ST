@@ -1,0 +1,602 @@
+﻿<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RoboScript AI - Asisten Roblox Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #080812; --bg2: #0e0e1f; --bg3: #13132a;
+    --border: #1e1e3f; --border2: #2a2a5a;
+    --purple: #7c3aed; --purple2: #5b21b6; --blue: #3b82f6;
+    --text: #e0e0ff; --muted: #6b7280; --accent: #a5b4fc;
+    --green: #4ade80; --sidebar-bg: #0c0c1e; --sidebar-icon: #5a5a7a;
+  }
+  body.light {
+    --bg: #f4f4f8; --bg2: #ffffff; --bg3: #eaeaf2;
+    --border: #dddde8; --border2: #c8c8dc;
+    --text: #1a1a2e; --muted: #888899; --accent: #5b21b6;
+    --sidebar-bg: #e8e8f0; --sidebar-icon: #8888aa;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; transition: background 0.3s, color 0.3s; }
+  body::before { content: ''; position: fixed; inset: 0; background-image: radial-gradient(circle at 25% 25%, rgba(124,58,237,0.05) 0%, transparent 50%), radial-gradient(circle at 75% 75%, rgba(59,130,246,0.05) 0%, transparent 50%); pointer-events: none; z-index: 0; }
+
+  /* SIDEBAR */
+  .sidebar { width: 48px; background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 10px 0; gap: 2px; flex-shrink: 0; position: relative; z-index: 20; transition: background 0.3s; }
+  .s-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; color: var(--sidebar-icon); transition: all 0.15s; position: relative; }
+  .s-icon:hover, .s-icon.active { background: rgba(124,58,237,0.15); color: var(--accent); }
+  .s-icon.active { color: var(--purple); }
+  .s-icon svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .s-tooltip { position: absolute; left: 46px; top: 50%; transform: translateY(-50%); background: var(--bg2); border: 1px solid var(--border2); color: var(--text); font-size: 11px; padding: 4px 9px; border-radius: 6px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 50; }
+  .s-icon:hover .s-tooltip { opacity: 1; }
+  .s-divider { width: 26px; height: 1px; background: var(--border); margin: 5px 0; }
+  .s-spacer { flex: 1; }
+
+  /* PANEL (right of sidebar) */
+  .panel { width: 0; overflow: hidden; background: var(--bg2); border-right: 0px solid var(--border); transition: width 0.25s ease, border-width 0.25s; flex-shrink: 0; display: flex; flex-direction: column; position: relative; z-index: 15; }
+  .panel.open { width: 240px; border-right-width: 1px; }
+  .panel-header { padding: 14px 16px 10px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .panel-title { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .panel-close { cursor: pointer; color: var(--muted); font-size: 16px; line-height: 1; padding: 2px 5px; border-radius: 4px; }
+  .panel-close:hover { color: var(--text); background: var(--bg3); }
+  .panel-body { flex: 1; overflow-y: auto; padding: 12px; }
+  .panel-body::-webkit-scrollbar { width: 3px; }
+  .panel-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  /* Toolbox panel */
+  .tool-item { background: var(--bg3); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; transition: all 0.15s; }
+  .tool-item:hover { border-color: var(--purple); background: rgba(124,58,237,0.07); }
+  .tool-item-name { font-size: 12px; font-weight: 500; color: var(--accent); margin-bottom: 3px; }
+  .tool-item-desc { font-size: 11px; color: var(--muted); }
+
+  /* History panel */
+  .hist-item { padding: 9px 10px; border-radius: 8px; margin-bottom: 6px; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }
+  .hist-item:hover { background: var(--bg3); border-color: var(--border); }
+  .hist-label { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hist-time { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .hist-empty { font-size: 12px; color: var(--muted); text-align: center; margin-top: 30px; }
+
+  /* Search panel */
+  .search-input-wrap { display: flex; align-items: center; background: var(--bg3); border: 1px solid var(--border2); border-radius: 9px; padding: 0 10px; margin-bottom: 10px; }
+  .search-input-wrap svg { width: 14px; height: 14px; stroke: var(--muted); fill: none; stroke-width: 1.6; stroke-linecap: round; flex-shrink: 0; }
+  .search-input { background: transparent; border: none; outline: none; color: var(--text); font-size: 13px; padding: 8px 8px; width: 100%; font-family: 'DM Sans', sans-serif; }
+  .search-input::placeholder { color: var(--muted); }
+  .search-result { padding: 8px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; margin-bottom: 5px; }
+  .search-result:hover { background: var(--bg3); border-color: var(--border); }
+  .search-result-role { font-size: 10px; color: var(--purple); text-transform: uppercase; font-family: 'Space Mono', monospace; margin-bottom: 2px; }
+  .search-result-text { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .search-empty { font-size: 12px; color: var(--muted); text-align: center; margin-top: 30px; }
+
+  /* Settings panel */
+  .setting-row { margin-bottom: 16px; }
+  .setting-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; font-family: 'Space Mono', monospace; letter-spacing: 0.8px; }
+  .setting-input { width: 100%; background: var(--bg3); border: 1px solid var(--border2); border-radius: 8px; color: var(--text); padding: 8px 10px; font-size: 13px; font-family: 'DM Sans', sans-serif; outline: none; }
+  .setting-input:focus { border-color: var(--purple); }
+  .setting-btn { width: 100%; background: linear-gradient(135deg, var(--purple), var(--blue)); border: none; border-radius: 8px; color: white; padding: 9px; font-size: 13px; font-family: 'DM Sans', sans-serif; cursor: pointer; margin-top: 6px; transition: opacity 0.2s; }
+  .setting-btn:hover { opacity: 0.85; }
+  .setting-desc { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* Crown popup */
+  .crown-wrap { position: relative; }
+  .crown-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; font-size: 19px; transition: all 0.2s; }
+  .crown-btn:hover { background: rgba(124,58,237,0.15); transform: scale(1.12); }
+  .crown-popup { display: none; position: absolute; left: 52px; bottom: 0; background: var(--bg2); border: 1px solid var(--border2); border-radius: 16px; padding: 18px; width: 230px; z-index: 100; box-shadow: 0 8px 40px rgba(0,0,0,0.7); }
+  .crown-popup.show { display: block; animation: popIn 0.18s ease; }
+  .crown-popup::before { content: ''; position: absolute; left: -7px; bottom: 14px; width: 12px; height: 12px; background: var(--bg2); border-left: 1px solid var(--border2); border-bottom: 1px solid var(--border2); transform: rotate(45deg); }
+  @keyframes popIn { from { opacity: 0; transform: translateX(-8px) scale(0.95); } to { opacity: 1; transform: none; } }
+  .popup-label { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 14px; }
+  .owner-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .o-avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .o-avatar.claude { background: linear-gradient(135deg, #7c3aed, #3b82f6); box-shadow: 0 0 10px rgba(124,58,237,0.4); }
+  .o-avatar.kitsune { background: linear-gradient(135deg, #f59e0b, #ef4444); box-shadow: 0 0 10px rgba(245,158,11,0.35); }
+  .o-name { font-size: 13px; font-weight: 500; color: var(--text); }
+  .o-role { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .popup-div { height: 1px; background: var(--border); margin: 12px 0; }
+  .yt-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background: #ff0000; color: white; font-size: 13px; font-weight: 600; padding: 9px 0; border-radius: 10px; cursor: pointer; border: none; font-family: 'DM Sans', sans-serif; transition: all 0.2s; text-decoration: none; }
+  .yt-btn:hover { background: #cc0000; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(255,0,0,0.35); }
+  .yt-icon { width: 18px; height: 18px; flex-shrink: 0; }
+
+  /* MAIN */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; z-index: 1; }
+  header { background: var(--bg2); padding: 13px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); position: relative; transition: background 0.3s; }
+  header::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--purple), transparent); opacity: 0.5; }
+  .logo { width: 38px; height: 38px; background: linear-gradient(135deg, var(--purple), var(--blue)); border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 19px; box-shadow: 0 0 16px rgba(124,58,237,0.35); flex-shrink: 0; }
+  .header-info h1 { font-family: 'Space Mono', monospace; font-size: 16px; color: var(--accent); }
+  .header-info p { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .status-badge { margin-left: auto; display: flex; align-items: center; gap: 6px; background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.2); color: var(--green); font-size: 11px; font-family: 'Space Mono', monospace; padding: 5px 12px; border-radius: 20px; }
+  .status-dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  #chat-area { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 18px; scroll-behavior: smooth; }
+  #chat-area::-webkit-scrollbar { width: 4px; }
+  #chat-area::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  .msg { display: flex; gap: 10px; max-width: 88%; animation: fadeUp 0.3s ease; }
+  .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
+  .msg.ai .avatar { background: linear-gradient(135deg, var(--purple), var(--blue)); box-shadow: 0 0 10px rgba(124,58,237,0.3); }
+  .msg.user .avatar { background: var(--bg3); border: 1px solid var(--border2); }
+  .bubble { padding: 11px 15px; border-radius: 16px; font-size: 14px; line-height: 1.7; }
+  .msg.ai .bubble { background: var(--bg2); border: 1px solid var(--border); border-radius: 4px 16px 16px 16px; }
+  .msg.user .bubble { background: linear-gradient(135deg, var(--purple), var(--purple2)); color: white; border-radius: 16px 4px 16px 16px; }
+  .bubble pre { background: #050510; border: 1px solid var(--border2); border-radius: 9px; padding: 12px; margin: 8px 0; overflow-x: auto; font-size: 12px; font-family: 'Space Mono', monospace; color: #a5f3fc; line-height: 1.6; position: relative; }
+  .bubble pre::before { content: 'lua'; position: absolute; top: 7px; right: 9px; font-size: 10px; color: var(--muted); font-family: 'Space Mono', monospace; text-transform: uppercase; }
+
+  /* copy code btn */
+  .copy-btn { position: absolute; top: 6px; right: 36px; background: rgba(124,58,237,0.2); border: 1px solid rgba(124,58,237,0.3); color: #a5b4fc; font-size: 10px; padding: 2px 7px; border-radius: 5px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .copy-btn:hover { background: rgba(124,58,237,0.4); }
+
+  .typing-indicator { display: flex; gap: 5px; align-items: center; padding: 4px 0; }
+  .typing-indicator span { width: 6px; height: 6px; background: var(--purple); border-radius: 50%; animation: bounce 1.3s infinite ease-in-out; }
+  .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-6px); opacity: 1; } }
+
+  .quick-btns { display: flex; flex-wrap: wrap; gap: 7px; padding: 2px 20px 10px; }
+  .quick-btn { background: var(--bg2); border: 1px solid var(--border2); color: var(--accent); padding: 6px 13px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.2s; font-family: 'DM Sans', sans-serif; }
+  .quick-btn:hover { background: var(--bg3); border-color: var(--purple); color: var(--text); transform: translateY(-1px); }
+
+  .input-area { padding: 14px 20px 18px; background: var(--bg2); border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: flex-end; transition: background 0.3s; }
+  .input-wrap { flex: 1; background: var(--bg3); border: 1px solid var(--border2); border-radius: 13px; display: flex; align-items: flex-end; transition: border-color 0.2s; }
+  .input-wrap:focus-within { border-color: var(--purple); }
+  textarea { flex: 1; background: transparent; border: none; outline: none; color: var(--text); padding: 10px 13px; font-size: 14px; resize: none; min-height: 42px; max-height: 120px; font-family: 'DM Sans', sans-serif; line-height: 1.5; }
+  textarea::placeholder { color: var(--muted); }
+  #send-btn { width: 42px; height: 42px; background: linear-gradient(135deg, var(--purple), var(--blue)); border: none; border-radius: 11px; cursor: pointer; color: white; font-size: 17px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; box-shadow: 0 0 14px rgba(124,58,237,0.3); }
+  #send-btn:hover { transform: scale(1.05); box-shadow: 0 0 22px rgba(124,58,237,0.5); }
+  #send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* new chat confirm */
+  .confirm-bar { display: none; background: rgba(124,58,237,0.12); border-top: 1px solid rgba(124,58,237,0.3); padding: 8px 20px; align-items: center; gap: 10px; font-size: 13px; color: var(--accent); }
+  .confirm-bar.show { display: flex; }
+  .confirm-yes { background: var(--purple); color: white; border: none; border-radius: 7px; padding: 5px 14px; font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .confirm-no { background: transparent; color: var(--muted); border: 1px solid var(--border2); border-radius: 7px; padding: 5px 14px; font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <!-- 1. Toggle Theme -->
+  <div class="s-icon" id="icon-theme" onclick="toggleTheme()" title="">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    <span class="s-tooltip">Ganti Tema</span>
+  </div>
+
+  <div class="s-divider"></div>
+
+  <!-- 2. New Chat -->
+  <div class="s-icon" onclick="newChat()" title="">
+    <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <span class="s-tooltip">Chat Baru</span>
+  </div>
+
+  <!-- 3. Search -->
+  <div class="s-icon" id="icon-search" onclick="togglePanel('search')" title="">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="22" y2="22"/></svg>
+    <span class="s-tooltip">Cari Chat</span>
+  </div>
+
+  <!-- 4. Toolbox -->
+  <div class="s-icon" id="icon-toolbox" onclick="togglePanel('toolbox')" title="">
+    <svg viewBox="0 0 24 24"><rect x="2" y="9" width="20" height="12" rx="2"/><path d="M8 9V7a4 4 0 0 1 8 0v2"/><line x1="12" y1="13" x2="12" y2="17"/></svg>
+    <span class="s-tooltip">Toolbox Lua</span>
+  </div>
+
+  <!-- 5. Focus Chat -->
+  <div class="s-icon" onclick="focusChat()" title="">
+    <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    <span class="s-tooltip">Fokus Input</span>
+  </div>
+
+  <!-- 6. History -->
+  <div class="s-icon" id="icon-history" onclick="togglePanel('history')" title="">
+    <svg viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+    <span class="s-tooltip">Riwayat</span>
+  </div>
+
+  <!-- 7. Settings -->
+  <div class="s-icon" id="icon-settings" onclick="togglePanel('settings')" title="">
+    <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="7" cy="7" r="1.8"/><circle cx="17" cy="7" r="1.8"/><circle cx="7" cy="17" r="1.8"/><circle cx="17" cy="17" r="1.8"/></svg>
+    <span class="s-tooltip">Pengaturan</span>
+  </div>
+
+  <div class="s-spacer"></div>
+
+  <!-- Crown -->
+  <div class="crown-wrap">
+    <div class="crown-btn" id="crown-btn" onclick="toggleCrown()">👑</div>
+    <div class="crown-popup" id="crown-popup">
+      <div class="popup-label">✦ Tentang Website</div>
+      <div class="owner-row">
+        <div class="o-avatar claude">🤖</div>
+        <div><div class="o-name">Claude</div><div class="o-role">Developer</div></div>
+      </div>
+      <div class="owner-row">
+        <div class="o-avatar kitsune">🦊</div>
+        <div><div class="o-name">Kitsune_Lucky18</div><div class="o-role">Owner &amp; Creator</div></div>
+      </div>
+      <div class="popup-div"></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;text-align:center;">Tonton konten Roblox di YouTube!</div>
+      <a class="yt-btn" href="https://youtube.com/@Kitsune_Lucky18" target="_blank">
+        <svg class="yt-icon" viewBox="0 0 24 24" fill="white"><path d="M23.5 6.2s-.3-2-1.2-2.8c-1.1-1.2-2.4-1.2-3-1.3C16.6 2 12 2 12 2s-4.6 0-7.3.1c-.6.1-1.9.1-3 1.3C.8 4.2.5 6.2.5 6.2S.2 8.5.2 10.8v2.1c0 2.3.3 4.6.3 4.6s.3 2 1.2 2.8c1.1 1.2 2.6 1.1 3.3 1.2C7.2 21.7 12 21.8 12 21.8s4.6 0 7.3-.2c.6-.1 1.9-.1 3-1.3.9-.8 1.2-2.8 1.2-2.8s.3-2.3.3-4.6v-2.1C23.8 8.5 23.5 6.2 23.5 6.2zM9.7 15.5V8.4l8.1 3.6-8.1 3.5z"/></svg>
+        Kitsune_Lucky18
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- PANEL -->
+<div class="panel" id="side-panel">
+  <div class="panel-header">
+    <span class="panel-title" id="panel-title">Panel</span>
+    <span class="panel-close" onclick="closePanel()">✕</span>
+  </div>
+  <div class="panel-body" id="panel-body"></div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <header>
+    <div class="logo">🤖</div>
+    <div class="header-info">
+      <h1 id="ai-name-display">RoboScript AI</h1>
+      <p>Asisten Roblox Studio berbasis Claude</p>
+    </div>
+    <div class="status-badge"><div class="status-dot"></div>Online</div>
+  </header>
+
+  <div id="chat-area">
+    <div class="msg ai">
+      <div class="avatar">🤖</div>
+      <div class="bubble">
+        Halo! Saya <b>RoboScript AI</b> — asisten khusus Roblox Studio kamu! 🎮<br><br>
+        Saya bisa bantu dengan:<br>
+        • Script Lua, LocalScript, ModuleScript<br>
+        • RemoteEvent &amp; RemoteFunction<br>
+        • GUI &amp; UI building<br>
+        • DataStore &amp; penyimpanan data<br>
+        • Debug dan troubleshooting error<br><br>
+        Mau tanya apa hari ini?
+      </div>
+    </div>
+  </div>
+
+  <div class="confirm-bar" id="confirm-bar">
+    ⚠️ Hapus semua chat dan mulai baru?
+    <button class="confirm-yes" onclick="confirmNewChat()">Ya, hapus</button>
+    <button class="confirm-no" onclick="cancelNewChat()">Batal</button>
+  </div>
+
+  <div class="quick-btns">
+    <button class="quick-btn" onclick="quickAsk('Cara membuat leaderboard di Roblox?')">🏆 Leaderboard</button>
+    <button class="quick-btn" onclick="quickAsk('Cara membuat toko dengan GUI di Roblox?')">🛒 Toko GUI</button>
+    <button class="quick-btn" onclick="quickAsk('Cara spawn player di lokasi tertentu?')">📍 Spawn Point</button>
+    <button class="quick-btn" onclick="quickAsk('Contoh script teleport antar place?')">🌀 Teleport</button>
+    <button class="quick-btn" onclick="quickAsk('Cara menyimpan data player dengan DataStore?')">💾 DataStore</button>
+    <button class="quick-btn" onclick="quickAsk('Cara membuat sistem nyawa/health bar?')">❤️ Health Bar</button>
+  </div>
+
+  <div class="input-area">
+    <div class="input-wrap">
+      <textarea id="user-input" placeholder="Tanya tentang Roblox Studio..." rows="1"
+        onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+    </div>
+    <button id="send-btn" onclick="sendMessage()">&#10148;</button>
+  </div>
+</div>
+
+<script>
+// ─── STATE ───
+let isLoading = false;
+let history = [];
+let aiName = 'RoboScript AI';
+let currentPanel = null;
+
+const chatArea = document.getElementById('chat-area');
+const input = document.getElementById('user-input');
+const sendBtn = document.getElementById('send-btn');
+
+// ─── SYSTEM PROMPT ───
+function getSystemPrompt() {
+  return `Kamu adalah ${aiName}, asisten ahli Roblox Studio yang berbahasa Indonesia. Kamu sangat mahir dalam:
+- Scripting Lua untuk Roblox (Script, LocalScript, ModuleScript)
+- RemoteEvent, RemoteFunction, BindableEvent
+- GUI dan UI Roblox
+- Animasi, Part, Model, dan building
+- DataStore untuk menyimpan data player
+- Debug dan troubleshooting error Roblox
+Jawab dengan jelas, santai, dan selalu sertakan contoh kode Lua yang bisa langsung dipakai jika relevan. Format kode dalam blok kode lua. Gunakan bahasa Indonesia yang ramah.`;
+}
+
+// ─── THEME ───
+function toggleTheme() {
+  document.body.classList.toggle('light');
+  const icon = document.getElementById('icon-theme');
+  icon.classList.toggle('active');
+}
+
+// ─── NEW CHAT ───
+function newChat() {
+  document.getElementById('confirm-bar').classList.add('show');
+}
+function confirmNewChat() {
+  history = [];
+  chatArea.innerHTML = '';
+  addMessage('ai', 'Chat baru dimulai! Halo lagi! 🎮 Mau tanya apa tentang Roblox Studio?');
+  document.getElementById('confirm-bar').classList.remove('show');
+}
+function cancelNewChat() {
+  document.getElementById('confirm-bar').classList.remove('show');
+}
+
+// ─── FOCUS CHAT ───
+function focusChat() {
+  input.focus();
+  input.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ─── PANEL ───
+const panelConfigs = {
+  search: {
+    title: '🔍 Cari Chat',
+    render: renderSearch
+  },
+  toolbox: {
+    title: '🧰 Toolbox Lua',
+    render: renderToolbox
+  },
+  history: {
+    title: '📋 Riwayat Chat',
+    render: renderHistory
+  },
+  settings: {
+    title: '⚙️ Pengaturan',
+    render: renderSettings
+  }
+};
+
+function togglePanel(name) {
+  const iconMap = { search: 'icon-search', toolbox: 'icon-toolbox', history: 'icon-history', settings: 'icon-settings' };
+  const panel = document.getElementById('side-panel');
+  if (currentPanel === name) {
+    closePanel(); return;
+  }
+  Object.values(iconMap).forEach(id => document.getElementById(id).classList.remove('active'));
+  currentPanel = name;
+  document.getElementById(iconMap[name]).classList.add('active');
+  document.getElementById('panel-title').textContent = panelConfigs[name].title;
+  panelConfigs[name].render();
+  panel.classList.add('open');
+}
+function closePanel() {
+  document.getElementById('side-panel').classList.remove('open');
+  const iconMap = { search: 'icon-search', toolbox: 'icon-toolbox', history: 'icon-history', settings: 'icon-settings' };
+  Object.values(iconMap).forEach(id => document.getElementById(id).classList.remove('active'));
+  currentPanel = null;
+}
+
+// ─── SEARCH ───
+function renderSearch() {
+  const body = document.getElementById('panel-body');
+  body.innerHTML = `
+    <div class="search-input-wrap">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="22" y2="22"/></svg>
+      <input class="search-input" id="search-q" placeholder="Ketik kata kunci..." oninput="doSearch()" />
+    </div>
+    <div id="search-results"><div class="search-empty">Ketik untuk mencari di riwayat chat</div></div>
+  `;
+  setTimeout(() => document.getElementById('search-q').focus(), 100);
+}
+function doSearch() {
+  const q = document.getElementById('search-q').value.toLowerCase().trim();
+  const results = document.getElementById('search-results');
+  if (!q) { results.innerHTML = '<div class="search-empty">Ketik untuk mencari di riwayat chat</div>'; return; }
+  const matches = history.filter(m => m.content.toLowerCase().includes(q));
+  if (!matches.length) { results.innerHTML = '<div class="search-empty">Tidak ditemukan 😕</div>'; return; }
+  results.innerHTML = matches.map((m, i) => `
+    <div class="search-result">
+      <div class="search-result-role">${m.role === 'user' ? '👤 Kamu' : '🤖 AI'}</div>
+      <div class="search-result-text">${m.content.substring(0, 80)}${m.content.length > 80 ? '...' : ''}</div>
+    </div>
+  `).join('');
+}
+
+// ─── TOOLBOX ───
+const luaSnippets = [
+  { name: '👤 Detect Player Added', desc: 'Event saat player masuk game', code: `game.Players.PlayerAdded:Connect(function(player)
+  print(player.Name .. " masuk!")
+end)` },
+  { name: '💀 Player Removed', desc: 'Event saat player keluar game', code: `game.Players.PlayerRemoving:Connect(function(player)
+  print(player.Name .. " keluar!")
+end)` },
+  { name: '🏆 Leaderboard Dasar', desc: 'Buat leaderstats sederhana', code: `game.Players.PlayerAdded:Connect(function(player)
+  local stats = Instance.new("Folder")
+  stats.Name = "leaderstats"
+  stats.Parent = player
+  local coins = Instance.new("IntValue")
+  coins.Name = "Coins"
+  coins.Value = 0
+  coins.Parent = stats
+end)` },
+  { name: '💾 DataStore Save', desc: 'Simpan data player', code: `local DataStoreService = game:GetService("DataStoreService")
+local ds = DataStoreService:GetDataStore("PlayerData")
+
+game.Players.PlayerRemoving:Connect(function(player)
+  local success, err = pcall(function()
+    ds:SetAsync(player.UserId, player.leaderstats.Coins.Value)
+  end)
+end)` },
+  { name: '📡 RemoteEvent', desc: 'Kirim data server ke client', code: `-- SERVER (Script)
+local event = game.ReplicatedStorage.RemoteEvent
+event:FireClient(player, "Hello dari server!")
+
+-- CLIENT (LocalScript)
+local event = game.ReplicatedStorage.RemoteEvent
+event.OnClientEvent:Connect(function(msg)
+  print(msg)
+end)` },
+  { name: '🖼️ GUI Button', desc: 'Tombol di ScreenGui', code: `local btn = script.Parent -- TextButton
+btn.MouseButton1Click:Connect(function()
+  print("Tombol diklik!")
+end)` },
+  { name: '💥 Damage Player', desc: 'Kurangi health karakter', code: `local function damagePlayer(player, amount)
+  local char = player.Character
+  if char then
+    local hum = char:FindFirstChild("Humanoid")
+    if hum then
+      hum.Health = hum.Health - amount
+    end
+  end
+end` },
+  { name: '🌀 Teleport Player', desc: 'Pindahkan player ke posisi', code: `local function teleportPlayer(player, position)
+  local char = player.Character
+  if char then
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+      hrp.CFrame = CFrame.new(position)
+    end
+  end
+end` },
+];
+function renderToolbox() {
+  const body = document.getElementById('panel-body');
+  body.innerHTML = luaSnippets.map((s, i) => `
+    <div class="tool-item" onclick="insertSnippet(${i})">
+      <div class="tool-item-name">${s.name}</div>
+      <div class="tool-item-desc">${s.desc}</div>
+    </div>
+  `).join('');
+}
+function insertSnippet(i) {
+  const s = luaSnippets[i];
+  input.value = `Tolong jelaskan dan bantu saya pakai snippet ini:\n\n\`\`\`lua\n${s.code}\n\`\`\``;
+  autoResize(input);
+  input.focus();
+  closePanel();
+}
+
+// ─── HISTORY ───
+function renderHistory() {
+  const body = document.getElementById('panel-body');
+  const userMsgs = history.filter(m => m.role === 'user');
+  if (!userMsgs.length) {
+    body.innerHTML = '<div class="hist-empty">Belum ada riwayat chat 💬</div>';
+    return;
+  }
+  body.innerHTML = userMsgs.map((m, i) => `
+    <div class="hist-item">
+      <div class="hist-label">💬 ${m.content.substring(0, 55)}${m.content.length > 55 ? '...' : ''}</div>
+      <div class="hist-time">Pesan #${i + 1}</div>
+    </div>
+  `).join('');
+}
+
+// ─── SETTINGS ───
+function renderSettings() {
+  const body = document.getElementById('panel-body');
+  body.innerHTML = `
+    <div class="setting-row">
+      <div class="setting-label">Nama AI</div>
+      <input class="setting-input" id="set-name" value="${aiName}" placeholder="Nama AI..." />
+      <div class="setting-desc">Ubah nama asisten AI kamu</div>
+    </div>
+    <button class="setting-btn" onclick="saveSettings()">💾 Simpan Pengaturan</button>
+    <div style="margin-top:20px;">
+      <div class="setting-label">Hapus Semua Chat</div>
+      <button class="setting-btn" style="background: linear-gradient(135deg,#dc2626,#991b1b);" onclick="confirmNewChat(); closePanel();">🗑️ Hapus Riwayat</button>
+    </div>
+  `;
+}
+function saveSettings() {
+  const nameInput = document.getElementById('set-name');
+  if (nameInput && nameInput.value.trim()) {
+    aiName = nameInput.value.trim();
+    document.getElementById('ai-name-display').textContent = aiName;
+  }
+  closePanel();
+  addMessage('ai', `Pengaturan disimpan! Nama saya sekarang ${aiName} 🎉`);
+}
+
+// ─── CROWN ───
+function toggleCrown() {
+  document.getElementById('crown-popup').classList.toggle('show');
+}
+document.addEventListener('click', function(e) {
+  const btn = document.getElementById('crown-btn');
+  const popup = document.getElementById('crown-popup');
+  if (btn && popup && !btn.contains(e.target) && !popup.contains(e.target)) popup.classList.remove('show');
+});
+
+// ─── CHAT ───
+function formatMessage(text) {
+  const parts = text.split(/(```(?:lua)?\n?[\s\S]*?```)/g);
+  return parts.map(part => {
+    if (part.startsWith('```')) {
+      const code = part.replace(/```(?:lua)?\n?/, '').replace(/```$/, '');
+      const safe = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const escaped = code.replace(/'/g, "\\'").replace(/\n/g,'\\n');
+      return `<pre><button class="copy-btn" onclick="copyCode('${escaped}')">Copy</button>${safe}</pre>`;
+    }
+    return part.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+               .replace(/\*\*(.*?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+  }).join('');
+}
+function copyCode(code) {
+  const decoded = code.replace(/\\n/g, '\n').replace(/\\'/g, "'");
+  navigator.clipboard.writeText(decoded).then(() => {
+    const btns = document.querySelectorAll('.copy-btn');
+    btns.forEach(b => { if (b.textContent === 'Copy') { b.textContent = '✓ Copied!'; setTimeout(() => b.textContent = 'Copy', 1500); } });
+  });
+}
+function addMessage(role, content) {
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  const av = document.createElement('div'); av.className = 'avatar';
+  av.textContent = role === 'ai' ? '🤖' : '👤';
+  const bub = document.createElement('div'); bub.className = 'bubble';
+  bub.innerHTML = role === 'ai' ? formatMessage(content) : content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  div.appendChild(av); div.appendChild(bub);
+  chatArea.appendChild(div); chatArea.scrollTop = chatArea.scrollHeight;
+}
+function addTyping() {
+  const div = document.createElement('div'); div.className = 'msg ai'; div.id = 'typing-msg';
+  div.innerHTML = `<div class="avatar">🤖</div><div class="bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
+  chatArea.appendChild(div); chatArea.scrollTop = chatArea.scrollHeight;
+}
+function removeTyping() { const t = document.getElementById('typing-msg'); if (t) t.remove(); }
+function quickAsk(text) { if (isLoading) return; input.value = text; sendMessage(); }
+function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
+
+async function sendMessage() {
+  const text = input.value.trim();
+  if (!text || isLoading) return;
+  isLoading = true; sendBtn.disabled = true;
+  input.value = ''; input.style.height = 'auto';
+  addMessage('user', text);
+  history.push({ role: 'user', content: text });
+  addTyping();
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, system: getSystemPrompt(), messages: history })
+    });
+    const data = await res.json();
+    const reply = data.content?.[0]?.text || 'Maaf, ada error. Coba lagi ya!';
+    removeTyping(); addMessage('ai', reply);
+    history.push({ role: 'assistant', content: reply });
+  } catch {
+    removeTyping(); addMessage('ai', 'Waduh, ada masalah koneksi. Coba lagi! 😅');
+    history.pop();
+  }
+  isLoading = false; sendBtn.disabled = false; input.focus();
+}
+input.focus();
+</script>
+</body>
+</html>
